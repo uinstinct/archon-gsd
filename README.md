@@ -54,6 +54,11 @@ by Archon, so your copy stays local):
 | `docker/Dockerfile.user` | `Dockerfile.user` |
 | `docker/install-gsd-runtime.sh` | `install-gsd-runtime.sh` |
 | `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
+| `docker/log-tail.ts` | `log-tail.ts` |
+
+`log-tail.ts` powers the Log sidecar — an observer-only `log-tail` service
+(stream Run transcripts with `docker compose logs -f log-tail`) with no build
+step; the `app` image is unaffected if you skip it.
 
 ```bash
 docker compose -f docker-compose.yml build   # base `archon` image first
