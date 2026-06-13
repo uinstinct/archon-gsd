@@ -34,13 +34,21 @@ because it prompts a human on ambiguity, which would stall a headless run.
 ## Runtime
 
 GSD runs inside a **custom Archon image** (node ≥ 22 + a container-global GSD
-install under the appuser home), baked on top of the `archon` base via Archon's
-own [`Dockerfile.user`](./docker/Dockerfile.user) extension slot, selected by a
-[`docker-compose.override.yml`](./docker-compose.override.yml) — so a plain
-`docker compose up` builds and runs it. Decisions recorded in
-[ADR 0001](./docs/adr/0001-gsd-runtime-via-custom-archon-image.md) (why baked +
+install), baked on top of the `archon` base via Archon's own
+[`Dockerfile.user`](./docker/Dockerfile.user) extension slot, selected by a
+[`docker-compose.override.yml`](./docker-compose.override.yml). Decisions recorded
+in [ADR 0001](./docs/adr/0001-gsd-runtime-via-custom-archon-image.md) (why baked +
 container-global) and [ADR 0002](./docs/adr/0002-deploy-via-dockerfile-user-and-compose-override.md)
 (why the Dockerfile.user + compose-override mechanism).
+
+Archon mounts the `archon_user_home` named volume over `/home/appuser`, which
+**shadows** the GSD install baked there — and Docker's empty-volume seeding does
+not fire reliably under Archon's entrypoint. So the image stashes a pristine GSD
+tree at `/opt/gsd-home/.claude` (outside the volume) and a seed entrypoint
+([`gsd-seed-entrypoint.sh`](./docker/gsd-seed-entrypoint.sh)) copies it into the
+live volume on every boot before exec'ing Archon's own entrypoint. This makes the
+Claude SDK resolve `/gsd-quick` and `/gsd-phase` regardless of volume state — no
+`down -v` needed on redeploy.
 
 Each **target repo** carries only its own `.planning/` (GSD config + state +
 roadmap) and must include the [headless config](./docs/headless-config.md) keys
@@ -62,19 +70,24 @@ Drop three files into your Archon checkout **root** (next to Archon's
 | `docker-compose.override.yml` | `docker-compose.override.yml` |
 | `docker/Dockerfile.user` | `Dockerfile.user` |
 | `docker/install-gsd-runtime.sh` | `install-gsd-runtime.sh` |
+| `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
 
 Build the base image first (the override's `Dockerfile.user` is `FROM archon`, so
-`archon` must exist before it builds), then bring the stack up:
+`archon` must exist before it builds), then build the extension and bring the
+stack up:
 
 ```bash
 docker compose -f docker-compose.yml build   # base `archon` (override excluded)
-docker compose up -d                          # builds Dockerfile.user, runs the stack
+docker compose up -d --build                  # builds Dockerfile.user extension, runs the stack
 ```
 
-Compose auto-merges `docker-compose.override.yml`, so the second command needs no
-flags. node ≥ 22 + GSD are baked into the `app` image — no per-boot cost. Override
-the Engine version via the `GSD_VERSION` build arg in `docker-compose.override.yml`.
-The runtime persists in the `archon_user_home` volume across rebuilds.
+`--build` is required: `docker compose up` alone will **not** rebuild the `app`
+image once `archon` exists, so it would silently run the plain base without GSD.
+Compose auto-merges `docker-compose.override.yml`, so no `-f` flag is needed on the
+second command. node ≥ 22 + GSD are baked into the `app` image — no per-boot cost.
+Override the Engine version via the `GSD_VERSION` build arg in
+`docker-compose.override.yml`. The seed entrypoint re-populates GSD into the
+`archon_user_home` volume on every boot, so rebuilds need no `down -v`.
 
 ### 2. Make the override workflow reach target repos
 
@@ -111,7 +124,8 @@ docker build -f docker/Dockerfile.smoke -t archon-gsd-smoke . && docker run --rm
 docker-compose.override.yml                     drops the Engine into Archon's `app` image
 docker/Dockerfile.user                          custom Archon image (FROM archon)
 docker/Dockerfile.smoke                         CI image proving the install script
-docker/install-gsd-runtime.sh                   shared node>=22 + GSD install
+docker/install-gsd-runtime.sh                   shared node>=22 + GSD install (+ /opt stash)
+docker/gsd-seed-entrypoint.sh                   seeds GSD into the home volume on boot
 tests/                                          deterministic guard/branch/routing tests
 tests/smoke/assert-runtime.sh                   container smoke assertions
 docs/headless-config.md                         mandatory target-repo config
