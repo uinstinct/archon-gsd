@@ -6,7 +6,7 @@ verify, review). None of Archon's native investigate / plan / implement / valida
 / review nodes run.
 
 Powers the [**archon-instinct** GitHub App](https://github.com/apps/archon-instinct),
-which runs this workflow on your issues.
+which runs this workflow on my issues.
 
 ```mermaid
 flowchart LR
