@@ -48,3 +48,15 @@ _Avoid_: gsd image, patched image
 **Target repo**:
 The repository an issue belongs to, cloned fresh by Archon into the container per run. Carries only its own `.planning/` (config + state) — the Engine runtime lives in the Custom image, not here.
 _Avoid_: workspace, checkout
+
+**Run transcript**:
+The per-run JSONL file Archon's file-logger writes to `/.archon/workspaces/{owner}/{repo}/logs/{runId}.jsonl` in the `archon_data` volume. Holds the full agent trace — assistant text, tool calls, node start/complete/error. The superset source of truth for what a run did.
+_Avoid_: logs (ambiguous — see Run events), output
+
+**Run events**:
+The DB rows Archon's UI renders for a run. A subset of the Run transcript; this is why the Command Center can show "only the input" while the transcript on disk holds everything.
+_Avoid_: logs, history
+
+**Log sidecar**:
+A separate container (its own service in `docker-compose.override.yml`, never the Archon `app` container) that mounts `archon_data` read-only and streams every Run transcript to stdout, one prefixed line per event. Read-only observer; touches nothing Archon writes.
+_Avoid_: log viewer, tailer
