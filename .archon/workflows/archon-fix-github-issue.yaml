@@ -1,0 +1,286 @@
+name: archon-fix-github-issue
+description: |
+  Use when: User wants to FIX, RESOLVE, or IMPLEMENT a solution for a GitHub issue.
+  Triggers: "fix this issue", "implement issue #123", "resolve this bug", "fix it",
+            "fix issue", "resolve issue", "fix #123".
+  NOT for: Comprehensive multi-agent reviews (use archon-issue-review-full),
+           questions about issues, CI failures, PR reviews, general exploration.
+
+  Shell -> Engine override of the bundled archon-fix-github-issue workflow.
+
+  Archon is the SHELL: it fetches the issue, guards the .planning/ precondition,
+  creates the fix/issue-<N> branch, classifies the issue size, opens the draft PR,
+  and reports back. GSD is the ENGINE: it researches, plans, executes, verifies,
+  and reviews — invoked headless via /gsd-quick (small) or /gsd-phase (large).
+
+  This file shadows the bundled default by exact filename. Archon's workflow
+  discovery loads it from the repo-scoped `.archon/workflows/` directory, which
+  overrides the bundled `archon-fix-github-issue.yaml`. None of Archon's native
+  investigate / plan / implement / validate / review nodes run — that work is the
+  Engine's. See CONTEXT.md (Shell, Engine, Routing, Headless) and docs/adr/0001.
+
+provider: claude
+model: medium
+
+nodes:
+  # ═══════════════════════════════════════════════════════════════
+  # SHELL — FETCH
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: extract-issue-number
+    prompt: |
+      Find the GitHub issue number for this request.
+
+      Request: $ARGUMENTS
+
+      Rules:
+      - If the message contains an explicit issue number (e.g., "#709", "issue 709", "709"), extract that number.
+      - If the message is ambiguous (e.g., "fix the SQLite timestamp bug"), use `gh issue list` to search for matching issues and pick the best match.
+
+      CRITICAL: Your final output must be ONLY the bare number with no quotes, no markdown, no explanation. Example correct output: 709
+
+  - id: fetch-issue
+    bash: |
+      # Strip quotes, whitespace, markdown backticks from AI output
+      ISSUE_NUM=$(echo "$extract-issue-number.output" | tr -d "'\"\`\n " | grep -oE '[0-9]+' | head -1)
+      if [ -z "$ISSUE_NUM" ]; then
+        echo "Failed to extract issue number from: $extract-issue-number.output" >&2
+        exit 1
+      fi
+      gh issue view "$ISSUE_NUM" --json title,body,labels,comments,state,url,author
+    depends_on: [extract-issue-number]
+
+  # ═══════════════════════════════════════════════════════════════
+  # SHELL — GUARD (.planning/ is a precondition, never bootstrapped)
+  # ═══════════════════════════════════════════════════════════════
+
+  # Fail fast unless the target repo is GSD-initialised. The Engine requires
+  # .planning/config.json, .planning/STATE.md, and .planning/ROADMAP.md (only the
+  # roadmap's existence is checked, not its phase status). gsd-new-project is
+  # NEVER invoked — an interactive project init would stall an unattended run.
+  - id: guard-planning
+    bash: |
+      set -euo pipefail
+      missing=()
+      [ -f .planning/config.json ] || missing+=("config.json")
+      [ -f .planning/STATE.md ]    || missing+=("STATE.md")
+      [ -f .planning/ROADMAP.md ]  || missing+=("ROADMAP.md")
+      if [ "${#missing[@]}" -gt 0 ]; then
+        echo "guard-planning: target repo is not GSD-initialised." >&2
+        echo "Missing under .planning/: ${missing[*]}" >&2
+        echo "" >&2
+        echo "This workflow requires an existing .planning/ (config.json, STATE.md," >&2
+        echo "ROADMAP.md). It will NOT run gsd-new-project. Initialise GSD in the" >&2
+        echo "target repo and commit .planning/, then retry." >&2
+        exit 1
+      fi
+      echo "guard-planning: .planning/ present (config.json, STATE.md, ROADMAP.md)"
+    depends_on: [fetch-issue]
+
+  # ═══════════════════════════════════════════════════════════════
+  # SHELL — BRANCH (Shell-owned; GSD's branching strategy is `none`)
+  # ═══════════════════════════════════════════════════════════════
+
+  # GSD's branching_strategy is `none` and quick_branch_template is null, so the
+  # Engine commits onto whatever branch is checked out. The Shell creates
+  # fix/issue-<N> off BASE_BRANCH first so the Engine's commits land on the
+  # feature branch; create-pr later pushes it and opens the draft PR.
+  - id: create-branch
+    bash: |
+      set -euo pipefail
+      ISSUE_NUM=$(echo "$extract-issue-number.output" | tr -d "'\"\`\n " | grep -oE '[0-9]+' | head -1)
+      if [ -z "$ISSUE_NUM" ]; then
+        echo "create-branch: could not resolve issue number" >&2
+        exit 1
+      fi
+      if [ -z "${BASE_BRANCH:-}" ]; then
+        echo "create-branch: BASE_BRANCH is not set" >&2
+        exit 1
+      fi
+      BRANCH="fix/issue-$ISSUE_NUM"
+      if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+        git switch "$BRANCH"
+        echo "create-branch: reusing existing $BRANCH"
+      else
+        git switch -c "$BRANCH" "$BASE_BRANCH"
+        echo "create-branch: created $BRANCH off $BASE_BRANCH"
+      fi
+    depends_on: [guard-planning]
+
+  # ═══════════════════════════════════════════════════════════════
+  # SHELL — ROUTING (Shell-owned; deliberately NOT gsd:do)
+  # ═══════════════════════════════════════════════════════════════
+
+  # A small model reads the issue and decides scope. Routing is owned here, NOT by
+  # GSD's `gsd:do` dispatcher, because gsd:do calls AskUserQuestion on route
+  # ambiguity, which would stall a headless run. `task` is the single-line handoff
+  # payload passed to the Engine command.
+  - id: size-classify
+    prompt: |
+      You are an issue sizing classifier for an automated coding pipeline.
+      Read the GitHub issue below and decide how large the change is.
+
+      ## Issue Content
+
+      $fetch-issue.output
+
+      ## Sizing Rules
+
+      | scope | When |
+      |-------|------|
+      | small | A single self-contained change: one bug, a small tweak, a localized fix, a few files at most. No cross-cutting design. |
+      | large | Multi-file or multi-step work: a new feature, a refactor spanning modules, anything needing a plan/build/verify loop. |
+
+      When uncertain, prefer `large` (the phase route honours the full GSD config).
+
+      Also produce `task`: a single-line, imperative restatement of the issue suitable
+      as the argument to a GSD command (no newlines, under 300 chars). Start with the
+      issue title; append the essential intent. Do not include the issue number.
+    depends_on: [fetch-issue]
+    model: small
+    allowed_tools: []
+    output_format:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: ["small", "large"]
+        task:
+          type: string
+        reasoning:
+          type: string
+      required: [scope, task, reasoning]
+
+  # ═══════════════════════════════════════════════════════════════
+  # ENGINE HANDOFF (headless GSD; in-session slash command)
+  # ═══════════════════════════════════════════════════════════════
+
+  # The handoff is an in-session prompt node: Archon runs the Claude SDK with the
+  # `claude_code` system preset and settingSources ['project','user'], so the
+  # container-global GSD install under the appuser home resolves /gsd-quick and
+  # /gsd-phase (registered in hyphen form for the Claude runtime). The body is the
+  # bare slash command so the SDK dispatches it as a command, not prose.
+  #
+  # HEADLESS PRECONDITION: the target repo's .planning/config.json must force
+  # unattended execution — `mode: "yolo"`, all `gates.*: false`, all `safety.*:
+  # false`. Otherwise the Engine blocks on a human. See docs/headless-config.md.
+  #
+  # Quick route uses granular flags (--research --validate), NOT --full: research
+  # + plan-check + verification while skipping discussion. (full-minus-discuss.)
+  #
+  # FALLBACK (confirm during build): if in-prompt slash resolution proves
+  # unreliable, replace the prompt body with a `bash:` node running
+  # `claude -p "/gsd-quick --research --validate <task>"` against the same install.
+
+  - id: handoff-quick
+    prompt: |
+      /gsd-quick --research --validate $size-classify.output.task
+    depends_on: [create-branch, size-classify]
+    when: "$size-classify.output.scope == 'small'"
+    context: fresh
+    model: large
+
+  - id: handoff-phase
+    prompt: |
+      /gsd-phase $size-classify.output.task
+    depends_on: [create-branch, size-classify]
+    when: "$size-classify.output.scope == 'large'"
+    context: fresh
+    model: large
+
+  # ═══════════════════════════════════════════════════════════════
+  # SHELL — CREATE DRAFT PR (rewired to read GSD's outputs)
+  # ═══════════════════════════════════════════════════════════════
+
+  # Only one handoff runs; one_success lets create-pr proceed off whichever fired.
+  - id: create-pr
+    prompt: |
+      Create a draft pull request for the current branch. The Engine (GSD) has
+      already done the coding work and committed it onto the fix/issue-<N> branch.
+
+      ## Context
+
+      - **Issue**: $ARGUMENTS
+      - **Scope**: $size-classify.output.scope
+      - **Task**: $size-classify.output.task
+
+      ## Instructions
+
+      1. Check git status. The Engine commits its own work atomically, so the tree
+         is normally clean. If uncommitted changes remain that are clearly part of
+         the fix, stage them BY NAME (`git add <path> ...`) — never `git add -A`,
+         `git add .`, or `git add -u`. Never commit scratch / report artifacts.
+      2. Push the branch: `git push -u origin HEAD`
+      3. Read the Engine's outputs from `.planning/` for the PR body — these reflect
+         what GSD actually did (Archon writes no investigation/plan/implementation
+         artifacts in this workflow):
+         - Quick route: the newest `.planning/quick/*/SUMMARY.md` (and its PLAN.md).
+         - Phase route: the relevant phase summaries under `.planning/` plus
+           `.planning/STATE.md`.
+         Pick whichever exists for the route that ran.
+      4. Check if a PR already exists for this branch: `gh pr list --head $(git branch --show-current)`.
+         If one exists, skip creation and capture its number.
+      5. Look for the project's PR template at `.github/pull_request_template.md`,
+         `.github/PULL_REQUEST_TEMPLATE.md`, or `docs/PULL_REQUEST_TEMPLATE.md`.
+      6. Create a DRAFT PR: `gh pr create --draft --base $BASE_BRANCH`
+         - Title: concise, imperative mood, under 70 chars.
+         - Body: if a template was found, fill every section from the GSD summary.
+           Otherwise write summary, changes, verification evidence (from GSD's
+           verifier output), and a `Fixes #...` line linking the issue.
+         - If you write the body to a file for `--body-file`, the file MUST live
+           under `/tmp/` — NEVER inside the worktree, or a later commit picks it up.
+      7. Capture PR identifiers under $ARTIFACTS_DIR:
+         ```bash
+         PR_NUMBER=$(gh pr view --json number -q '.number')
+         echo "$PR_NUMBER" > "$ARTIFACTS_DIR/.pr-number"
+         PR_URL=$(gh pr view --json url -q '.url')
+         echo "$PR_URL" > "$ARTIFACTS_DIR/.pr-url"
+         ```
+    depends_on: [handoff-quick, handoff-phase]
+    trigger_rule: one_success
+    context: fresh
+
+  - id: verify-pr-base
+    bash: |
+      set -euo pipefail
+      EXPECTED="$BASE_BRANCH"
+      ACTUAL=$(gh pr view --json baseRefName -q '.baseRefName')
+      if [ "$ACTUAL" != "$EXPECTED" ]; then
+        PR_NUMBER=$(gh pr view --json number -q '.number')
+        echo "Base mismatch on PR #$PR_NUMBER: expected=$EXPECTED actual=$ACTUAL — re-targeting" >&2
+        gh pr edit "$PR_NUMBER" --base "$EXPECTED"
+      else
+        echo "PR base verified: $EXPECTED"
+      fi
+    depends_on: [create-pr]
+
+  # ═══════════════════════════════════════════════════════════════
+  # SHELL — REPORT (rewired to read GSD's summary)
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: report
+    prompt: |
+      Post a completion report back to the GitHub issue, built from the Engine's
+      own outputs (GSD's summary) and the PR that was opened.
+
+      ## Context
+
+      - **Issue**: $ARGUMENTS
+      - **Scope**: $size-classify.output.scope
+
+      ## Instructions
+
+      1. Read the PR number and URL from `$ARTIFACTS_DIR/.pr-number` and
+         `$ARTIFACTS_DIR/.pr-url`.
+      2. Read the Engine's summary from `.planning/`:
+         - Quick route: the newest `.planning/quick/*/SUMMARY.md`.
+         - Phase route: the phase summaries under `.planning/` and `.planning/STATE.md`.
+      3. Resolve the issue number from $ARGUMENTS (the digits, e.g. 709).
+      4. Comment on the issue with `gh issue comment <N> --body-file <file under /tmp/>`:
+         - A one-paragraph summary of what GSD did (from its SUMMARY).
+         - The verification result (from GSD's verifier output, if present).
+         - A link to the draft PR.
+         - Up to 3 concrete follow-up suggestions if the summary surfaced any.
+         Keep it factual — report what the Engine actually did; do not invent results.
+    depends_on: [verify-pr-base]
+    context: fresh
