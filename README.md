@@ -5,6 +5,9 @@ Re-points Archon's `archon-fix-github-issue` workflow so **Archon is a thin Shel
 verify, review). None of Archon's native investigate / plan / implement / validate
 / review nodes run.
 
+Powers the [**archon-instinct** GitHub App](https://github.com/apps/archon-instinct),
+which runs this workflow on your issues.
+
 ```mermaid
 flowchart LR
     issue([GitHub issue]) --> shellA
