@@ -45,8 +45,22 @@ See [CONTEXT.md](./CONTEXT.md) for the shared vocabulary and
 You run Archon from its own checkout. Three things must be in place: the Engine
 baked into the image, the override workflow reachable, and each target repo prepared.
 
-**1. Bake the Engine.** Copy these into your Archon checkout root (all gitignored
-by Archon, so your copy stays local):
+**1. Bake the Engine.** From your Archon checkout root (the directory holding
+Archon's `docker-compose.yml`), run the one-liner — it pulls the five files
+below straight from this repo:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/uinstinct/archon-gsd/main/scripts/add-to-archon.sh | bash
+```
+
+It writes the GSD-owned helpers directly and will **not** clobber
+`docker-compose.override.yml` or `Dockerfile.user` if you already use those
+Archon extension slots: when yours exists and differs, the incoming content is
+appended under a labelled merge banner and the script tells you to fold it in by
+hand. Re-running is safe (idempotent). Target a checkout elsewhere with
+`| bash -s -- /path/to/archon`.
+
+The files it places (all gitignored by Archon, so your copy stays local):
 
 | from this repo | to Archon checkout |
 |----------------|--------------------|
@@ -56,6 +70,7 @@ by Archon, so your copy stays local):
 | `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
 | `docker/log-tail.ts` | `log-tail.ts` |
 
+Prefer to copy them yourself? The table is the full manifest. Either way,
 `log-tail.ts` powers the Log sidecar — an observer-only `log-tail` service
 (stream Run transcripts with `docker compose logs -f log-tail`) with no build
 step; the `app` image is unaffected if you skip it.
