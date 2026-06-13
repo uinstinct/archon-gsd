@@ -1,0 +1,6 @@
+.agents/
+.claude/
+
+# Python bytecode from the test harness
+__pycache__/
+*.pyc

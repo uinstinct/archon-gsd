@@ -1,0 +1,26 @@
+# CI smoke image: proves docker/install-gsd-runtime.sh against an Archon-like
+# base WITHOUT building all of Archon (which needs a full bun build of the web
+# UI). We reuse the exact install script the production image runs, on a base
+# that mirrors the traits the script depends on:
+#   - oven/bun:slim, like Archon's runtime base, ships NO node (so the script's
+#     node>=22 install is exercised for real);
+#   - a non-root `appuser` at uid 1001 with home /home/appuser, matching Archon.
+#
+# Build + run:
+#   docker build -f docker/Dockerfile.smoke -t archon-gsd-smoke .
+#   docker run --rm archon-gsd-smoke      # runs the assertions as appuser
+FROM oven/bun:1.3.11-slim
+
+ARG GSD_VERSION=1.5.0-rc.2
+
+RUN useradd -m -u 1001 -s /bin/bash appuser
+
+COPY docker/install-gsd-runtime.sh /usr/local/bin/install-gsd-runtime.sh
+RUN chmod +x /usr/local/bin/install-gsd-runtime.sh \
+    && GSD_VERSION="${GSD_VERSION}" APP_USER=appuser /usr/local/bin/install-gsd-runtime.sh
+
+COPY tests/smoke/assert-runtime.sh /usr/local/bin/assert-runtime.sh
+RUN chmod +x /usr/local/bin/assert-runtime.sh
+
+USER appuser
+CMD ["bash", "/usr/local/bin/assert-runtime.sh"]

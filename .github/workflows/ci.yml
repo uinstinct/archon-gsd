@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Deterministic Shell-plumbing checks: guard, branch, and routing wiring.
+  # No Archon runtime, no live Claude, no LLM-output assertions — these run the
+  # workflow's own bash node bodies and inspect its `when:` guards.
+  shell-plumbing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run deterministic tests
+        run: bash tests/run-all.sh
+
+  # Image smoke test: build docker/Dockerfile.smoke (the shared install script on
+  # an Archon-like base) and assert node>=22, gsd-tools.cjs runs, and the GSD
+  # commands resolve under the container user's home.
+  container-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build smoke image
+        run: docker build -f docker/Dockerfile.smoke -t archon-gsd-smoke .
+      - name: Run smoke assertions
+        run: docker run --rm archon-gsd-smoke
