@@ -24,5 +24,13 @@ COPY install-gsd-runtime.sh /usr/local/bin/install-gsd-runtime.sh
 RUN chmod +x /usr/local/bin/install-gsd-runtime.sh \
     && GSD_VERSION="${GSD_VERSION}" APP_USER=appuser /usr/local/bin/install-gsd-runtime.sh
 
+# Seed entrypoint: Archon mounts the archon_user_home volume over /home/appuser,
+# shadowing the baked GSD install, and Docker's empty-volume seeding does not fire
+# reliably here. This wrapper copies the /opt/gsd-home stash into the live volume
+# on every boot, then exec's Archon's real docker-entrypoint.sh. See ADR 0001.
+COPY gsd-seed-entrypoint.sh /usr/local/bin/gsd-seed-entrypoint.sh
+RUN chmod +x /usr/local/bin/gsd-seed-entrypoint.sh
+ENTRYPOINT ["gsd-seed-entrypoint.sh"]
+
 # Archon's entrypoint (docker-entrypoint.sh) starts as root and drops to appuser
 # via gosu; leave the final USER as root so that contract is unchanged.

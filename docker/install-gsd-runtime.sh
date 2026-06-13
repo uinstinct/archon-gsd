@@ -46,3 +46,15 @@ su -s /bin/sh "$APP_USER" -c \
   "HOME='$APP_HOME' npx --yes '@opengsd/gsd-core@${GSD_VERSION}' --claude --global </dev/null"
 
 echo "==> GSD installed under $APP_HOME/.claude"
+
+# Stash a pristine copy OUTSIDE the home, because Archon mounts a named volume
+# (archon_user_home) over $APP_HOME at runtime — that volume shadows everything
+# baked here, and Docker's empty-volume seeding does NOT fire reliably under
+# Archon's entrypoint. The seed entrypoint (gsd-seed-entrypoint.sh) copies this
+# stash into the live volume on every boot. Paths inside the copy already point
+# at $APP_HOME (it is a copy of the $APP_HOME install), so nothing is rewritten.
+STAGING_HOME="${STAGING_HOME:-/opt/gsd-home}"
+echo "==> Stashing pristine GSD at $STAGING_HOME/.claude (survives the $APP_HOME volume mount)"
+mkdir -p "$STAGING_HOME"
+cp -a "$APP_HOME/.claude" "$STAGING_HOME/.claude"
+echo "==> Staging copy ready: $STAGING_HOME/.claude"
