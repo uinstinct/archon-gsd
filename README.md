@@ -48,10 +48,14 @@ so the Engine never waits on a human.
 
 ## Add archon-gsd to an existing Archon setup
 
-You run Archon from its own checkout with `docker compose up`. To bake the Engine
-into Archon's `app` image, drop three files into that checkout **root** (next to
-Archon's `docker-compose.yml`) — all are gitignored by Archon, so your copy stays
-local:
+You run Archon from its own checkout with `docker compose up`. A working
+integration needs three things in place — the Engine baked into the image, the
+override workflow reachable from target repos, and each target repo prepared.
+
+### 1. Bake the Engine into Archon's `app` image
+
+Drop three files into your Archon checkout **root** (next to Archon's
+`docker-compose.yml`) — all are gitignored by Archon, so your copy stays local:
 
 | copy this repo's… | to your Archon checkout as… |
 |-------------------|-----------------------------|
@@ -59,8 +63,8 @@ local:
 | `docker/Dockerfile.user` | `Dockerfile.user` |
 | `docker/install-gsd-runtime.sh` | `install-gsd-runtime.sh` |
 
-Then build the base image first (the override's `Dockerfile.user` is `FROM
-archon`, so `archon` must exist before it builds), and bring the stack up:
+Build the base image first (the override's `Dockerfile.user` is `FROM archon`, so
+`archon` must exist before it builds), then bring the stack up:
 
 ```bash
 docker compose -f docker-compose.yml build   # base `archon` (override excluded)
@@ -70,11 +74,35 @@ docker compose up -d                          # builds Dockerfile.user, runs the
 Compose auto-merges `docker-compose.override.yml`, so the second command needs no
 flags. node ≥ 22 + GSD are baked into the `app` image — no per-boot cost. Override
 the Engine version via the `GSD_VERSION` build arg in `docker-compose.override.yml`.
+The runtime persists in the `archon_user_home` volume across rebuilds.
 
-The Engine runtime persists in the `archon_user_home` volume; each **target repo**
-still needs its own committed `.planning/` (see above). The override workflow
-reaches target repos either container-global at `~/.archon/workflows/` or
-per-repo — see [docs/e2e-run.md](./docs/e2e-run.md).
+### 2. Make the override workflow reach target repos
+
+The Shell→Engine workflow must shadow Archon's bundled `archon-fix-github-issue`.
+Place [`.archon/workflows/archon-fix-github-issue.yaml`](./.archon/workflows/archon-fix-github-issue.yaml)
+either:
+
+- **container-global** at `~/.archon/workflows/` in the image (every cloned target
+  repo inherits it), or
+- **per target repo** — commit it under that repo's `.archon/workflows/`.
+
+### 3. Prepare each target repo
+
+Every repo an issue belongs to must be GSD-initialised and headless:
+
+- commit `.planning/config.json`, `.planning/STATE.md`, `.planning/ROADMAP.md`
+  (the `guard-planning` entry node fails fast without them — it never bootstraps);
+- set the [headless config](./docs/headless-config.md) keys in
+  `.planning/config.json` so the Engine never waits on a human.
+
+### 4. Verify
+
+Confirm the baked runtime with the smoke test (it exercises the same install
+script the image runs), then drive the full path per [docs/e2e-run.md](./docs/e2e-run.md):
+
+```bash
+docker build -f docker/Dockerfile.smoke -t archon-gsd-smoke . && docker run --rm archon-gsd-smoke
+```
 
 ## Repo layout
 
