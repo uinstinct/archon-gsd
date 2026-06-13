@@ -54,6 +54,31 @@ Each **target repo** carries only its own `.planning/` (GSD config + state +
 roadmap) and must include the [headless config](./docs/headless-config.md) keys
 so the Engine never waits on a human.
 
+## Watching agent runs (Log sidecar)
+
+Archon's Command Center renders **Run events** (a DB subset that, in practice,
+shows little past the input). The full agent trace — assistant text, tool calls,
+per-node progress — lives in the **Run transcript** JSONL files Archon's
+file-logger already writes to the `archon_data` volume. The **Log sidecar**
+([`docker/log-tail.ts`](./docker/log-tail.ts)) surfaces those transcripts.
+
+It is a separate `log-tail` service in
+[`docker-compose.override.yml`](./docker-compose.override.yml) — a sibling of
+`app`, never inside it. It mounts `archon_data` **read-only** at `/.archon` (pure
+observer; it cannot corrupt anything Archon writes), dumps every existing
+transcript, then live-follows new and growing ones. Watch the combined stream
+with tooling you already use:
+
+```bash
+docker compose logs -f log-tail
+```
+
+Every line is prefixed `[runId|node]` so interleaved runs stay attributable.
+`assistant` messages render as readable single lines (long ones truncated; the
+full text stays in the file), `tool` calls as `→ Tool(input summary)`, and node
+lifecycle as distinct `●` markers. Editing the script and restarting the service
+is the whole change loop — no Dockerfile, no rebuild.
+
 ## Add archon-gsd to an existing Archon setup
 
 You run Archon from its own checkout with `docker compose up`. A working
@@ -71,6 +96,11 @@ Drop three files into your Archon checkout **root** (next to Archon's
 | `docker/Dockerfile.user` | `Dockerfile.user` |
 | `docker/install-gsd-runtime.sh` | `install-gsd-runtime.sh` |
 | `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
+| `docker/log-tail.ts` | `log-tail.ts` |
+
+`log-tail.ts` powers the **Log sidecar** (see below); the override bind-mounts it
+into a stock `oven/bun` container. It is observer-only — no build step, and the
+`app` image is unaffected if you skip it.
 
 Build the base image first (the override's `Dockerfile.user` is `FROM archon`, so
 `archon` must exist before it builds), then build the extension and bring the
@@ -126,7 +156,10 @@ docker/Dockerfile.user                          custom Archon image (FROM archon
 docker/Dockerfile.smoke                         CI image proving the install script
 docker/install-gsd-runtime.sh                   shared node>=22 + GSD install (+ /opt stash)
 docker/gsd-seed-entrypoint.sh                   seeds GSD into the home volume on boot
+docker/log-tail.ts                              Log sidecar — streams Run transcripts to stdout
 tests/                                          deterministic guard/branch/routing tests
+tests/log-sidecar.test.sh                       Log sidecar process-seam test (docker run)
+tests/fixtures/log-sidecar/                     fixture transcripts for the sidecar test
 tests/smoke/assert-runtime.sh                   container smoke assertions
 docs/headless-config.md                         mandatory target-repo config
 docs/e2e-run.md                                 manual end-to-end procedure
@@ -138,7 +171,7 @@ CONTEXT.md                                       domain glossary
 ## Tests
 
 ```bash
-bash tests/run-all.sh                                   # guard / branch / routing (deterministic)
+bash tests/run-all.sh                                   # guard / branch / routing + log-sidecar (deterministic)
 docker build -f docker/Dockerfile.smoke -t archon-gsd-smoke .
 docker run --rm archon-gsd-smoke                        # container smoke test
 ```

@@ -1,0 +1,13 @@
+{"type":"workflow_start","workflow_id":"run-aaa111","workflow_name":"archon-fix-github-issue","content":"Fix #4: add the log sidecar","ts":"2026-06-13T10:00:00.000Z"}
+{"type":"node_start","workflow_id":"run-aaa111","step":"guard-planning","content":"bash","ts":"2026-06-13T10:00:01.000Z"}
+{"type":"node_complete","workflow_id":"run-aaa111","step":"guard-planning","content":"bash","duration_ms":12,"ts":"2026-06-13T10:00:01.100Z"}
+{"type":"node_start","workflow_id":"run-aaa111","step":"size-classify","content":"size-classify","ts":"2026-06-13T10:00:02.000Z"}
+{"type":"assistant","workflow_id":"run-aaa111","content":"The issue is small and self-contained.","ts":"2026-06-13T10:00:03.000Z"}
+{"type":"node_complete","workflow_id":"run-aaa111","step":"size-classify","content":"size-classify","ts":"2026-06-13T10:00:03.500Z"}
+{"type":"node_start","workflow_id":"run-aaa111","step":"handoff-quick","content":"/gsd-quick","ts":"2026-06-13T10:00:04.000Z"}
+{"type":"assistant","workflow_id":"run-aaa111","content":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE ZZTAILMARKERZZ","ts":"2026-06-13T10:00:05.000Z"}
+{"type":"tool","workflow_id":"run-aaa111","tool_name":"Bash","tool_input":{"command":"git status"},"ts":"2026-06-13T10:00:06.000Z"}
+{"type":"tool","workflow_id":"run-aaa111","tool_name":"Edit","tool_input":{"file_path":"/repo/src/x.ts","old_string":"a","new_string":"b"},"ts":"2026-06-13T10:00:07.000Z"}
+{"type":"validation","workflow_id":"run-aaa111","check":"tests","result":"pass","step":"handoff-quick","ts":"2026-06-13T10:00:08.000Z"}
+{"type":"node_complete","workflow_id":"run-aaa111","step":"handoff-quick","content":"/gsd-quick","duration_ms":4200,"ts":"2026-06-13T10:00:09.000Z"}
+{"type":"workflow_complete","workflow_id":"run-aaa111","ts":"2026-06-13T10:00:10.000Z"}

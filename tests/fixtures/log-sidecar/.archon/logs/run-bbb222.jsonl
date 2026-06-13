@@ -1,0 +1,7 @@
+{"type":"workflow_start","workflow_id":"run-bbb222","workflow_name":"archon-fix-github-issue","content":"Fix #7: rework the parser","ts":"2026-06-13T11:00:00.000Z"}
+{"type":"node_start","workflow_id":"run-bbb222","step":"guard-planning","content":"bash","ts":"2026-06-13T11:00:01.000Z"}
+{"type":"node_skipped","workflow_id":"run-bbb222","step":"create-branch","content":"branch already exists","ts":"2026-06-13T11:00:02.000Z"}
+{"type":"node_start","workflow_id":"run-bbb222","step":"handoff-phase","content":"/gsd-phase","ts":"2026-06-13T11:00:03.000Z"}
+{"type":"assistant","workflow_id":"run-bbb222","content":"Planning the change across\nmultiple lines of reasoning.","ts":"2026-06-13T11:00:04.000Z"}
+{"type":"node_error","workflow_id":"run-bbb222","step":"handoff-phase","error":"engine crashed","ts":"2026-06-13T11:00:05.000Z"}
+{"type":"workflow_error","workflow_id":"run-bbb222","error":"run failed","ts":"2026-06-13T11:00:06.000Z"}
