@@ -53,11 +53,6 @@ below straight from this repo:
 curl -fsSL https://raw.githubusercontent.com/uinstinct/archon-gsd/main/scripts/add-to-archon.sh | bash
 ```
 
-If you already have a `docker-compose.override.yml` or `Dockerfile.user`, the
-script won't overwrite it — it appends the incoming content under a merge banner
-for you to fold in by hand. Re-running is safe. Target a checkout elsewhere with
-`| bash -s -- /path/to/archon`.
-
 The files it places (all gitignored by Archon, so your copy stays local):
 
 | from this repo | to Archon checkout |
