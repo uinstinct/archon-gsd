@@ -9,11 +9,13 @@ deliberately does not: real GSD execution and real PR creation.
 
 ## Prerequisites
 
-- The custom image is built and wired into Archon's stack
-  (`docker build -f docker/Dockerfile -t archon-gsd .`, then point the Archon app
-  service at `archon-gsd`). Confirm with the smoke test:
-  `docker run --rm archon-gsd bash /usr/local/bin/assert-runtime.sh`
-  (copy `tests/smoke/assert-runtime.sh` into the image, or run it ad hoc).
+- The custom image is built and wired into Archon's stack via the
+  `docker-compose.override.yml` + `Dockerfile.user` drop-in (see the README,
+  "Add archon-gsd to an existing Archon setup"): copy them plus
+  `install-gsd-runtime.sh` into the Archon checkout, then
+  `docker compose -f docker-compose.yml build && docker compose up -d`. Confirm
+  the runtime with the smoke test (it builds the same install script):
+  `docker build -f docker/Dockerfile.smoke -t archon-gsd-smoke . && docker run --rm archon-gsd-smoke`.
 - A **fixture target repo** on GitHub that:
   - is GSD-initialised — committed `.planning/config.json`, `.planning/STATE.md`,
     `.planning/ROADMAP.md` (so `guard-planning` passes);

@@ -1,0 +1,28 @@
+# Archon's user-extension Dockerfile, carrying the GSD (Engine) runtime.
+#
+# This is a TEMPLATE shipped by the archon-gsd repo. Deploy it as `Dockerfile.user`
+# at your Archon checkout root (Archon's gitignored extension slot, see
+# Dockerfile.user.example upstream). It extends Archon's locally-built `archon`
+# image and layers on node >= 22 plus a container-global GSD install under the
+# appuser home. See docs/adr/0001 (why baked + container-global) and docs/adr/0002
+# (why this Dockerfile.user + compose-override mechanism over a standalone image).
+#
+# Built automatically by `docker compose up` once docker-compose.override.yml is
+# in place (it points `app.build.dockerfile` here). The base `archon` image must
+# already exist — build it first with `docker compose -f docker-compose.yml build`.
+ARG BASE_IMAGE=archon
+FROM ${BASE_IMAGE}
+
+# Pin the Engine version (re-confirm against upstream if gsd-core moves; the
+# integration was investigated against 1.5.0-rc.2). Override via the build arg in
+# docker-compose.override.yml or with --build-arg.
+ARG GSD_VERSION=1.5.0-rc.2
+
+USER root
+# install-gsd-runtime.sh sits at the Archon checkout root (the build context).
+COPY install-gsd-runtime.sh /usr/local/bin/install-gsd-runtime.sh
+RUN chmod +x /usr/local/bin/install-gsd-runtime.sh \
+    && GSD_VERSION="${GSD_VERSION}" APP_USER=appuser /usr/local/bin/install-gsd-runtime.sh
+
+# Archon's entrypoint (docker-entrypoint.sh) starts as root and drops to appuser
+# via gosu; leave the final USER as root so that contract is unchanged.

@@ -1,0 +1,30 @@
+# Archon-GSD drop-in: build the Engine (GSD) runtime INTO Archon's own `app`
+# image via Archon's supported Dockerfile.user extension slot.
+#
+# This is a TEMPLATE shipped by the archon-gsd repo. Deploy it into your Archon
+# checkout (the directory holding Archon's docker-compose.yml). See the README,
+# "Add archon-gsd to an existing Archon setup". Copy three files to the Archon
+# checkout root:
+#   docker-compose.override.yml   (this file)
+#   Dockerfile.user               (from docker/Dockerfile.user)
+#   install-gsd-runtime.sh        (from docker/install-gsd-runtime.sh)
+#
+# Compose auto-merges docker-compose.override.yml with Archon's docker-compose.yml
+# (no flags). The base sets `app: { build: ., image: archon }`; this override
+# flips the build to Dockerfile.user (FROM archon) so the same `app` image gains
+# node>=22 + a container-global GSD install — baked at build, no per-boot cost.
+# See docs/adr/0002 (build mechanism) and docs/adr/0001 (why baked + container-global).
+#
+# Dockerfile.user is `FROM archon`, so the base `archon` image must exist FIRST.
+# Two-step (base built without the override, then up with the merge):
+#   docker compose -f docker-compose.yml build     # base `archon`
+#   docker compose up -d                            # builds Dockerfile.user, runs
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.user
+      args:
+        # Pin the Engine version; re-confirm against upstream if gsd-core moves.
+        GSD_VERSION: 1.5.0-rc.2

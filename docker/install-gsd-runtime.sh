@@ -8,9 +8,10 @@
 #      Claude SDK (settingSources includes 'user') resolves /gsd-quick and
 #      /gsd-phase for every freshly cloned target repo.
 #
-# This script is shared verbatim by the production image (docker/Dockerfile,
-# FROM archon) and the CI smoke image (docker/Dockerfile.smoke, an Archon-like
-# base) so CI proves the exact steps the real image runs. Run as root.
+# This script is shared verbatim by the production image (docker/Dockerfile.user,
+# FROM archon, deployed into an Archon checkout) and the CI smoke image
+# (docker/Dockerfile.smoke, an Archon-like base) so CI proves the exact steps the
+# real image runs. Run as root.
 set -euo pipefail
 
 GSD_VERSION="${GSD_VERSION:-1.5.0-rc.2}"

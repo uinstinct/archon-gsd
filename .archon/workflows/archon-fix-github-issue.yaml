@@ -24,40 +24,16 @@ model: medium
 
 nodes:
   # ═══════════════════════════════════════════════════════════════
-  # SHELL — FETCH
-  # ═══════════════════════════════════════════════════════════════
-
-  - id: extract-issue-number
-    prompt: |
-      Find the GitHub issue number for this request.
-
-      Request: $ARGUMENTS
-
-      Rules:
-      - If the message contains an explicit issue number (e.g., "#709", "issue 709", "709"), extract that number.
-      - If the message is ambiguous (e.g., "fix the SQLite timestamp bug"), use `gh issue list` to search for matching issues and pick the best match.
-
-      CRITICAL: Your final output must be ONLY the bare number with no quotes, no markdown, no explanation. Example correct output: 709
-
-  - id: fetch-issue
-    bash: |
-      # Strip quotes, whitespace, markdown backticks from AI output
-      ISSUE_NUM=$(echo "$extract-issue-number.output" | tr -d "'\"\`\n " | grep -oE '[0-9]+' | head -1)
-      if [ -z "$ISSUE_NUM" ]; then
-        echo "Failed to extract issue number from: $extract-issue-number.output" >&2
-        exit 1
-      fi
-      gh issue view "$ISSUE_NUM" --json title,body,labels,comments,state,url,author
-    depends_on: [extract-issue-number]
-
-  # ═══════════════════════════════════════════════════════════════
   # SHELL — GUARD (.planning/ is a precondition, never bootstrapped)
   # ═══════════════════════════════════════════════════════════════
 
-  # Fail fast unless the target repo is GSD-initialised. The Engine requires
-  # .planning/config.json, .planning/STATE.md, and .planning/ROADMAP.md (only the
-  # roadmap's existence is checked, not its phase status). gsd-new-project is
-  # NEVER invoked — an interactive project init would stall an unattended run.
+  # ENTRY NODE — fail fast before ANY spend. guard-planning reads only local
+  # files, so it runs first: a non-GSD-initialised target repo dies here before
+  # the LLM call (extract-issue-number) or the GitHub API call (fetch-issue) ever
+  # run. The Engine requires .planning/config.json, .planning/STATE.md, and
+  # .planning/ROADMAP.md (only the roadmap's existence is checked, not its phase
+  # status). gsd-new-project is NEVER invoked — an interactive project init would
+  # stall an unattended run.
   - id: guard-planning
     bash: |
       set -euo pipefail
@@ -75,7 +51,36 @@ nodes:
         exit 1
       fi
       echo "guard-planning: .planning/ present (config.json, STATE.md, ROADMAP.md)"
-    depends_on: [fetch-issue]
+    # No depends_on: this is the DAG entry node so the precondition is checked
+    # before any LLM or GitHub spend.
+
+  # ═══════════════════════════════════════════════════════════════
+  # SHELL — FETCH (gated by the guard — no spend until .planning/ confirmed)
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: extract-issue-number
+    prompt: |
+      Find the GitHub issue number for this request.
+
+      Request: $ARGUMENTS
+
+      Rules:
+      - If the message contains an explicit issue number (e.g., "#709", "issue 709", "709"), extract that number.
+      - If the message is ambiguous (e.g., "fix the SQLite timestamp bug"), use `gh issue list` to search for matching issues and pick the best match.
+
+      CRITICAL: Your final output must be ONLY the bare number with no quotes, no markdown, no explanation. Example correct output: 709
+    depends_on: [guard-planning]
+
+  - id: fetch-issue
+    bash: |
+      # Strip quotes, whitespace, markdown backticks from AI output
+      ISSUE_NUM=$(echo "$extract-issue-number.output" | tr -d "'\"\`\n " | grep -oE '[0-9]+' | head -1)
+      if [ -z "$ISSUE_NUM" ]; then
+        echo "Failed to extract issue number from: $extract-issue-number.output" >&2
+        exit 1
+      fi
+      gh issue view "$ISSUE_NUM" --json title,body,labels,comments,state,url,author
+    depends_on: [extract-issue-number]
 
   # ═══════════════════════════════════════════════════════════════
   # SHELL — BRANCH (Shell-owned; GSD's branching strategy is `none`)
@@ -105,7 +110,10 @@ nodes:
         git switch -c "$BRANCH" "$BASE_BRANCH"
         echo "create-branch: created $BRANCH off $BASE_BRANCH"
       fi
-    depends_on: [guard-planning]
+    # depends_on fetch-issue (not guard-planning): guard is now the root so it is
+    # upstream of everything; create-branch needs the resolved issue number, which
+    # extract-issue-number (-> fetch-issue) produces.
+    depends_on: [fetch-issue]
 
   # ═══════════════════════════════════════════════════════════════
   # SHELL — ROUTING (Shell-owned; deliberately NOT gsd:do)
