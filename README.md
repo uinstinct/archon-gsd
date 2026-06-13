@@ -63,11 +63,6 @@ The files it places (all gitignored by Archon, so your copy stays local):
 | `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
 | `docker/log-tail.ts` | `log-tail.ts` |
 
-Prefer to copy them yourself? The table is the full manifest. Either way,
-`log-tail.ts` powers the Log sidecar — an observer-only `log-tail` service
-(stream Run transcripts with `docker compose logs -f log-tail`) with no build
-step; the `app` image is unaffected if you skip it.
-
 ```bash
 docker compose -f docker-compose.yml build   # base `archon` image first
 docker compose up -d --build                 # builds the GSD extension, runs the stack
