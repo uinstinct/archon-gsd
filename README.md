@@ -60,8 +60,25 @@ The files it places (all gitignored by Archon, so your copy stays local):
 | `docker-compose.override.yml` | `docker-compose.override.yml` |
 | `docker/Dockerfile.user` | `Dockerfile.user` |
 | `docker/install-gsd-runtime.sh` | `install-gsd-runtime.sh` |
+| `docker/configure-commit-identity.sh` | `configure-commit-identity.sh` |
 | `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
 | `docker/log-tail.ts` | `log-tail.ts` |
+
+**Set the bot commit identity (optional).** To attribute the Engine's commits to
+the [archon-instinct](https://github.com/apps/archon-instinct) GitHub App (rather
+than the host's ambient git identity), add to your Archon checkout's `.env`:
+
+```bash
+COMMIT_AUTHOR_NAME=archon-instinct[bot]
+# Bot no-reply email: <app-user-id>+<app-slug>[bot]@users.noreply.github.com
+# Find <app-user-id> at https://api.github.com/users/archon-instinct[bot]
+COMMIT_AUTHOR_EMAIL=1234567+archon-instinct[bot]@users.noreply.github.com
+```
+
+These are baked into the image's system git config at build time (re-run
+`docker compose up -d --build` after changing them). The build also disables
+Claude Code's `Co-Authored-By: Claude` commit trailer
+(`includeCoAuthoredBy: false`). Leave the vars unset to keep the ambient identity.
 
 
 ```bash

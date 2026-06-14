@@ -4,7 +4,7 @@
 #
 # These run the installer for real, but point its download base at a file:// URL
 # of this repo (ARCHON_GSD_RAW), so no network is touched. They assert the three
-# behaviours that matter: a clean install lands all five files, a re-run is a
+# behaviours that matter: a clean install lands all the files, a re-run is a
 # no-op, and a pre-existing differing override/Dockerfile.user is preserved with
 # the incoming content appended under the merge banner rather than clobbered.
 set -uo pipefail
@@ -34,7 +34,7 @@ echo "== add-to-archon.sh =="
 DEST="$(make_archon_dir)"
 run_installer "$DEST"
 for f in docker-compose.override.yml Dockerfile.user install-gsd-runtime.sh \
-         gsd-seed-entrypoint.sh log-tail.ts; do
+         configure-commit-identity.sh gsd-seed-entrypoint.sh log-tail.ts; do
   [ -f "$DEST/$f" ] && pass "fresh: $f written" || fail "fresh: $f missing"
 done
 cmp -s "$REPO_ROOT/docker-compose.override.yml" "$DEST/docker-compose.override.yml" \

@@ -15,6 +15,7 @@
 #   docker-compose.override.yml       (merge slot)
 #   docker/Dockerfile.user        -> Dockerfile.user            (merge slot)
 #   docker/install-gsd-runtime.sh -> install-gsd-runtime.sh
+#   docker/configure-commit-identity.sh -> configure-commit-identity.sh
 #   docker/gsd-seed-entrypoint.sh -> gsd-seed-entrypoint.sh
 #   docker/log-tail.ts            -> log-tail.ts
 #
@@ -43,6 +44,7 @@ FILES=(
   "docker-compose.override.yml|merge"
   "docker/Dockerfile.user|merge"
   "docker/install-gsd-runtime.sh|copy"
+  "docker/configure-commit-identity.sh|copy"
   "docker/gsd-seed-entrypoint.sh|copy"
   "docker/log-tail.ts|copy"
 )
@@ -125,7 +127,7 @@ for entry in "${FILES[@]}"; do
 done
 
 # Keep the shell helpers executable.
-for sh in install-gsd-runtime.sh gsd-seed-entrypoint.sh; do
+for sh in install-gsd-runtime.sh gsd-seed-entrypoint.sh configure-commit-identity.sh; do
   [ -f "$DEST/$sh" ] && chmod +x "$DEST/$sh"
 done
 
