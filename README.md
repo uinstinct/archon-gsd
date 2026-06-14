@@ -63,6 +63,7 @@ The files it places (all gitignored by Archon, so your copy stays local):
 | `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
 | `docker/log-tail.ts` | `log-tail.ts` |
 
+
 ```bash
 docker compose -f docker-compose.yml build   # base `archon` image first
 docker compose up -d --build                 # builds the GSD extension, runs the stack

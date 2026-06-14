@@ -57,6 +57,5 @@ _Avoid_: logs (ambiguous — see Run events), output
 The DB rows Archon's UI renders for a run. A subset of the Run transcript; this is why the Command Center can show "only the input" while the transcript on disk holds everything.
 _Avoid_: logs, history
 
-**Log sidecar**:
-A separate container (its own service in `docker-compose.override.yml`, never the Archon `app` container) that mounts `archon_data` read-only and streams every Run transcript to stdout, one prefixed line per event. Read-only observer; touches nothing Archon writes.
+A separate container (its own service in `docker-compose.override.yml`, never the Archon `app` container) that mounts `archon_data` read-only and streams every Run transcript to stdout, one prefixed line per event. It also mounts `archon_user_home` read-only and renders Claude Code session transcripts (`~/.claude/projects/**`), covering comment-triggered runs that aren't Workflow runs. Read-only observer; touches nothing Archon writes.
 _Avoid_: log viewer, tailer

@@ -12,6 +12,7 @@ echo "log-sidecar"
 BUN_IMAGE="oven/bun:1.3.11-slim"
 SCRIPT="$REPO_ROOT/docker/log-tail.ts"
 FIX="$REPO_ROOT/tests/fixtures/log-sidecar"
+FIXHOME="$REPO_ROOT/tests/fixtures/log-sidecar-home"
 
 # Skip cleanly where docker is unavailable so the deterministic suite still
 # passes locally; CI always has docker (same as the smoke test).
@@ -23,7 +24,9 @@ fi
 
 out="$(docker run --rm \
   -e LOG_TAIL_FOLLOW=0 \
+  -e LOG_TAIL_HOME=/.home \
   -v "$FIX":/.archon:ro \
+  -v "$FIXHOME":/.home:ro \
   -v "$SCRIPT":/log-tail.ts:ro \
   "$BUN_IMAGE" bun /log-tail.ts 2>/dev/null)" || {
   fail "sidecar did not run under $BUN_IMAGE"
@@ -104,5 +107,19 @@ if [ "$nlines" -eq 1 ]; then
 else
   fail "multi-line assistant content not collapsed to one line"
 fi
+# 10. Claude Code session logs are rendered with the same [runId|node] prefix.
+if has '[sess-ccc333|fix/issue-9] user: @archon run the spec'; then pass 10; else fail 10 "missing claude user line"; fi
+
+# 11. Claude assistant text, tool_use, and failed tool_result render.
+if has "[sess-ccc333|fix/issue-9] assistant: I'll run the spec now." && has '[sess-ccc333|fix/issue-9] → Bash(command=npx playwright test)'; then pass 11; else fail 11 "missing claude assistant/tool lines"; fi
+
+# 12. Claude sidechain lines render under `subagent` node.
+if has '[sess-ccc333|subagent] assistant: subagent thinking out loud'; then pass 12; else fail 12 "missing claude sidechain line"; fi
+
+# 13. Failed tool_result surfaces; successful tool_result is skipped (noise).
+if has '[sess-ccc333|fix/issue-9] ← ERROR Exit code 127 rtk: command not found'; then pass 13; else fail 13 "missing claude error tool_result"; fi
+
+# 14. Thinking, successful tool_result, and meta events are skipped.
+if ! has 'OK big output' && ! has 'secret' && ! has 'queue-operation'; then pass 14; else fail 14 "skipped content leaked into output"; fi
 
 summary
