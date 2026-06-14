@@ -21,7 +21,7 @@ set -euo pipefail
 RTK_VERSION="${RTK_VERSION:-v0.42.4}"
 RTK_INSTALL_DIR="${RTK_INSTALL_DIR:-/usr/local/bin}"
 
-echo "==> Ensuring rtk build deps (ca-certificates, curl, tar)"
+echo "==> Ensuring rtk installer deps (ca-certificates, curl, tar)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl tar
@@ -29,11 +29,18 @@ rm -rf /var/lib/apt/lists/*
 
 # Install via rtk's official script with its documented env overrides. The
 # Linux x86_64 asset (rtk-x86_64-unknown-linux-musl.tar.gz) is selected
-# automatically. Running as root, so install.sh's internal sudo (if any) is a
-# no-op and writing to /usr/local/bin needs none.
+# automatically. Running as root, so writing to /usr/local/bin needs no sudo.
+#
+# Fetch install.sh from the ${RTK_VERSION} tag, NOT master: the binary is
+# pinned, so the installer that runs as root must be pinned to the same release
+# for a reproducible build (a mutable master fetch is a root-level supply-chain
+# surface). Download to a variable on its own line first so a curl failure (DNS,
+# 404, 5xx, truncation) trips set -e HERE with the real cause, instead of being
+# swallowed by `sh -c "$(curl ...)"` — where a failed substitution yields an
+# empty string and `sh -c ""` exits 0, mis-reported later as "rtk not found".
 echo "==> Installing rtk ${RTK_VERSION} to ${RTK_INSTALL_DIR}"
-RTK_VERSION="${RTK_VERSION}" RTK_INSTALL_DIR="${RTK_INSTALL_DIR}" \
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh)"
+rtk_installer="$(curl -fsSL "https://raw.githubusercontent.com/rtk-ai/rtk/${RTK_VERSION}/install.sh")"
+RTK_VERSION="${RTK_VERSION}" RTK_INSTALL_DIR="${RTK_INSTALL_DIR}" sh -c "$rtk_installer"
 
 # Verification gate (mirror the GSD node>=22 gate): the binary must exist and run
 # at the install dir, or fail the build loudly rather than ship a broken image.
@@ -46,4 +53,13 @@ if ! RTK_VER="$("$RTK_BIN" --version 2>/dev/null)"; then
   echo "FATAL: $RTK_BIN is present but '--version' did not run" >&2
   exit 1
 fi
+# Assert the binary that landed is actually the pinned release — "runs" is not
+# enough. install.sh is upstream code; a change in how it honors RTK_VERSION
+# could install a different version while every other check still passes, making
+# the reproducible-build claim silently false. Strip the leading 'v' before
+# matching (rtk prints e.g. "rtk 0.42.4", the tag is "v0.42.4").
+case "$RTK_VER" in
+  *"${RTK_VERSION#v}"*) : ;;
+  *) echo "FATAL: installed rtk '$RTK_VER' does not match pinned $RTK_VERSION" >&2; exit 1 ;;
+esac
 echo "==> rtk $RTK_VER OK at $RTK_BIN"
