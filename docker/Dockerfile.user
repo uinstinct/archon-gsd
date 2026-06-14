@@ -28,10 +28,11 @@ RUN chmod +x /usr/local/bin/install-gsd-runtime.sh \
     && GSD_VERSION="${GSD_VERSION}" APP_USER=appuser /usr/local/bin/install-gsd-runtime.sh
 
 # Bot commit identity + Claude co-author trailer. Values flow from .env ->
-# docker-compose.override.yml build args -> these ARGs. Baked into /etc config
-# (outside the shadowed appuser home) by the shared script. Both knobs are
-# optional; omit the author args to keep the ambient identity. See ADR 0001 for
-# the home-volume shadow rule this side-steps.
+# docker-compose.override.yml build args -> these ARGs. Set COMMIT_AUTHOR_NAME
+# alone; configure-commit-identity.sh derives the no-reply email from the GitHub
+# users API (COMMIT_AUTHOR_EMAIL is an optional override). Baked into /etc config
+# (outside the shadowed appuser home). Both knobs are optional; omit the name to
+# keep the ambient identity. See ADR 0001 for the home-volume shadow rule.
 ARG COMMIT_AUTHOR_NAME=""
 ARG COMMIT_AUTHOR_EMAIL=""
 COPY configure-commit-identity.sh /usr/local/bin/configure-commit-identity.sh

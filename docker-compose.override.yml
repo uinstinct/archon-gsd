@@ -31,9 +31,11 @@ services:
       args:
         # Pin the Engine version; re-confirm against upstream if gsd-core moves.
         GSD_VERSION: 1.5.0-rc.2
-        # Bot commit identity, sourced from .env. Empty -> the image keeps the
-        # ambient git identity. For GitHub App attribution use the bot's
-        # no-reply email: <app-user-id>+<app-slug>[bot]@users.noreply.github.com
+        # Bot commit identity, sourced from .env. Set COMMIT_AUTHOR_NAME alone
+        # (e.g. archon-instinct[bot]); the build derives the no-reply email
+        # <app-user-id>+<name>@users.noreply.github.com from the GitHub users
+        # API. Empty name -> the image keeps the ambient git identity.
+        # COMMIT_AUTHOR_EMAIL is an optional override of that derived value.
         COMMIT_AUTHOR_NAME: ${COMMIT_AUTHOR_NAME:-}
         COMMIT_AUTHOR_EMAIL: ${COMMIT_AUTHOR_EMAIL:-}
 

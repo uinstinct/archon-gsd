@@ -64,6 +64,29 @@ else
   fail "managed-settings.json missing/!=false or invalid JSON"
 fi
 
+# --- Case A2: only the name set -> email derived from the GitHub users API ----
+# Point GITHUB_API_BASE at a local fixture (curl reads it via file://) so the
+# derivation is proven without the network. The id below is the real account id
+# for archon-instinct[bot]; EMAIL above is "<id>+<login>@users.noreply...".
+: >"$SYSCFG"; rm -f "$MANAGED"
+APIDIR="$WORK/api/users"; mkdir -p "$APIDIR"
+printf '{ "login": "%s", "id": 1234567, "node_id": "X", "gravatar_id": "" }\n' "$NAME" >"$APIDIR/$NAME"
+GIT_CONFIG_SYSTEM="$SYSCFG" CLAUDE_MANAGED_SETTINGS="$MANAGED" \
+  GITHUB_API_BASE="file://$WORK/api" COMMIT_AUTHOR_NAME="$NAME" \
+  sh "$SCRIPT" >/dev/null 2>&1 || { fail "script exited non-zero (case A2)"; }
+
+[ "$(resolve_val user.email)" = "$EMAIL" ] \
+  && pass "user.email derived from name + api id when EMAIL unset" \
+  || fail "derived user.email = '$(resolve_val user.email)', expected '$EMAIL'"
+
+# --- Case A3: only the name set but the lookup fails -> hard error -------------
+: >"$SYSCFG"
+GIT_CONFIG_SYSTEM="$SYSCFG" CLAUDE_MANAGED_SETTINGS="$MANAGED" \
+  GITHUB_API_BASE="file://$WORK/does-not-exist" COMMIT_AUTHOR_NAME="$NAME" \
+  sh "$SCRIPT" >/dev/null 2>&1 \
+  && fail "script should exit non-zero when the email cannot be derived" \
+  || pass "derivation failure is a hard error (no silent ambient fallback)"
+
 # --- Case B: author vars unset -> no system identity, but trailer still off ---
 : >"$SYSCFG"; rm -f "$MANAGED"
 GIT_CONFIG_SYSTEM="$SYSCFG" CLAUDE_MANAGED_SETTINGS="$MANAGED" \
