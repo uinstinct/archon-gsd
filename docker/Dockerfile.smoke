@@ -28,5 +28,6 @@ RUN chmod +x /usr/local/bin/install-rtk.sh \
 COPY tests/smoke/assert-runtime.sh /usr/local/bin/assert-runtime.sh
 RUN chmod +x /usr/local/bin/assert-runtime.sh
 
+WORKDIR /home/appuser
 USER appuser
 CMD ["bash", "/usr/local/bin/assert-runtime.sh"]
