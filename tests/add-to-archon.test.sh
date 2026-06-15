@@ -34,7 +34,7 @@ echo "== add-to-archon.sh =="
 DEST="$(make_archon_dir)"
 run_installer "$DEST"
 for f in docker-compose.override.yml Dockerfile.user install-gsd-runtime.sh \
-         configure-commit-identity.sh gsd-seed-entrypoint.sh log-tail.ts; do
+         install-rtk.sh configure-commit-identity.sh gsd-seed-entrypoint.sh log-tail.ts; do
   [ -f "$DEST/$f" ] && pass "fresh: $f written" || fail "fresh: $f missing"
 done
 cmp -s "$REPO_ROOT/docker-compose.override.yml" "$DEST/docker-compose.override.yml" \
@@ -46,6 +46,9 @@ cmp -s "$REPO_ROOT/docker/Dockerfile.user" "$DEST/Dockerfile.user" \
 [ -x "$DEST/install-gsd-runtime.sh" ] \
   && pass "fresh: install-gsd-runtime.sh is executable" \
   || fail "fresh: install-gsd-runtime.sh not executable"
+[ -x "$DEST/install-rtk.sh" ] \
+  && pass "fresh: install-rtk.sh is executable" \
+  || fail "fresh: install-rtk.sh not executable"
 grep -qF "$MERGE_BEGIN" "$DEST/docker-compose.override.yml" \
   && fail "fresh: override should NOT carry a merge banner" \
   || pass "fresh: override has no merge banner"

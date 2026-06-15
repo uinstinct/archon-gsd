@@ -60,6 +60,7 @@ The files it places (all gitignored by Archon, so your copy stays local):
 | `docker-compose.override.yml` | `docker-compose.override.yml` |
 | `docker/Dockerfile.user` | `Dockerfile.user` |
 | `docker/install-gsd-runtime.sh` | `install-gsd-runtime.sh` |
+| `docker/install-rtk.sh` | `install-rtk.sh` |
 | `docker/configure-commit-identity.sh` | `configure-commit-identity.sh` |
 | `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
 | `docker/log-tail.ts` | `log-tail.ts` |

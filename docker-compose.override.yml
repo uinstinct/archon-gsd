@@ -31,6 +31,8 @@ services:
       args:
         # Pin the Engine version; re-confirm against upstream if gsd-core moves.
         GSD_VERSION: 1.5.0-rc.2
+        # Pin the rtk (Rust Token Killer) version; override to bump.
+        RTK_VERSION: v0.42.4
         # Bot commit identity, sourced from .env. Set COMMIT_AUTHOR_NAME alone
         # (e.g. archon-instinct[bot]); the build derives the no-reply email
         # <app-user-id>+<name>@users.noreply.github.com from the GitHub users

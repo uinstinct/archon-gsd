@@ -25,6 +25,12 @@ export HOME="$WORK/home"; mkdir -p "$HOME"
 export XDG_CONFIG_HOME="$WORK/xdg"; mkdir -p "$XDG_CONFIG_HOME"
 export GIT_CONFIG_GLOBAL="$WORK/global-gitconfig"; : >"$GIT_CONFIG_GLOBAL"
 unset GIT_CONFIG_NOSYSTEM 2>/dev/null || true
+# Isolate from the runtime's baked commit identity too: the Archon container
+# exports COMMIT_AUTHOR_NAME/EMAIL (and may set GITHUB_API_BASE), which would
+# leak into the absence cases (A3, B) and mask the script's behaviour. Cases
+# that need these set them inline on the `sh "$SCRIPT"` line, so clearing them
+# here is safe and makes the suite hermetic in CI and inside the image alike.
+unset COMMIT_AUTHOR_NAME COMMIT_AUTHOR_EMAIL GITHUB_API_BASE 2>/dev/null || true
 
 # resolve_in_fresh_repo <key> — what `git config <key>` returns in a clean repo
 # with only the system file (our SYSCFG) populated, mirroring a fresh worktree.
