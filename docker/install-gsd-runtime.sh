@@ -41,7 +41,7 @@ if [ -z "$APP_HOME" ]; then
   exit 1
 fi
 # Global Claude install lands at $APP_HOME/.claude (the Claude SDK 'user' source).
-# Both runtime and location are passed explicitly so the installer never prompts.
+cd "$APP_HOME"
 su -s /bin/sh "$APP_USER" -c \
   "HOME='$APP_HOME' npx --yes '@opengsd/gsd-core@${GSD_VERSION}' --claude --global </dev/null"
 
