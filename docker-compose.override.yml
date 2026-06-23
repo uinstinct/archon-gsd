@@ -58,6 +58,13 @@ services:
         # healthy. A dead proxy under headless GSD would otherwise stall silently.
         condition: service_healthy
 
+    container_name: archon
+    networks:
+      archon-network:   # inherited from base compose — keep it so app still reaches postgres
+      proxy:
+    ports: !override
+      - "127.0.0.1:${PORT:-3000}:${PORT:-3000}"
+
   # Headroom proxy sidecar: a transparent context-compression layer between
   # Claude Code and the Anthropic API (60-95% token savings). Replaces the old
   # baked rtk binary. Lean mode — no qdrant/neo4j memory stack. It forwards the
