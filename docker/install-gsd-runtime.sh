@@ -14,7 +14,7 @@
 # real image runs. Run as root.
 set -euo pipefail
 
-GSD_VERSION="${GSD_VERSION:-1.5.0-rc.2}"
+GSD_VERSION="${GSD_VERSION:-latest}"
 APP_USER="${APP_USER:-appuser}"
 
 echo "==> Installing node >= 22 and git"

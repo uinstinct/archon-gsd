@@ -17,10 +17,9 @@
 ARG BASE_IMAGE=archon
 FROM ${BASE_IMAGE}
 
-# Pin the Engine version (re-confirm against upstream if gsd-core moves; the
-# integration was investigated against 1.5.0-rc.2). Override via the build arg in
-# docker-compose.override.yml or with --build-arg.
-ARG GSD_VERSION=1.5.0-rc.2
+# Engine version: defaults to latest stable from npm. Override via the build arg
+# in docker-compose.override.yml or with --build-arg.
+ARG GSD_VERSION=latest
 
 # Pinned rtk (Rust Token Killer) release; override via the compose build arg or
 # with --build-arg. Keep in sync with docker-compose.override.yml and install-rtk.sh.
