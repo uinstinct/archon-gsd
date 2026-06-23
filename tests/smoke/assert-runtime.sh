@@ -54,18 +54,6 @@ for cmd in gsd-quick gsd-phase; do
   fi
 done
 
-# 5. rtk (Rust Token Killer) is on PATH and runs — proving /usr/local/bin/rtk is
-#    readable/executable by appuser (it lives outside the shadowed home volume).
-if command -v rtk >/dev/null 2>&1; then
-  if rtk --version >/dev/null 2>&1; then
-    pass "rtk present and runs ($(rtk --version 2>/dev/null | head -n1))"
-  else
-    fail "rtk on PATH but --version failed"
-  fi
-else
-  fail "rtk not found on PATH"
-fi
-
 echo ""
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

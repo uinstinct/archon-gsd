@@ -45,6 +45,10 @@ _Avoid_: settings file (ambiguous — Archon has its own)
 The bespoke Archon container image carrying node≥22 and a container-global GSD install at `/home/appuser/.claude/`. The stock `oven/bun` image cannot run the Engine. See [ADR 0001](./docs/adr/0001-gsd-runtime-via-custom-archon-image.md).
 _Avoid_: gsd image, patched image
 
+**Headroom proxy**:
+The sidecar service (its own service in `docker-compose.override.yml`, never the Archon `app` container) that transparently compresses every Claude Code → Anthropic call for token savings. Reached by the Engine via `ANTHROPIC_BASE_URL`; **requires** `ENABLE_TOOL_SEARCH=true` on the Shell's `app` service, or Claude Code materializes every tool schema into context and breaks the Engine's sub-agents. Replaces the former baked rtk binary. See [ADR 0003](./docs/adr/0003-token-compression-via-headroom-proxy.md).
+_Avoid_: token killer, rtk, compressor
+
 **Target repo**:
 The repository an issue belongs to, cloned fresh by Archon into the container per run. Carries only its own `.planning/` (config + state) — the Engine runtime lives in the Custom image, not here.
 _Avoid_: workspace, checkout

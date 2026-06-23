@@ -117,7 +117,7 @@ if has "[sess-ccc333|fix/issue-9] assistant: I'll run the spec now." && has '[se
 if has '[sess-ccc333|subagent] assistant: subagent thinking out loud'; then pass 12; else fail 12 "missing claude sidechain line"; fi
 
 # 13. Failed tool_result surfaces; successful tool_result is skipped (noise).
-if has '[sess-ccc333|fix/issue-9] ← ERROR Exit code 127 rtk: command not found'; then pass 13; else fail 13 "missing claude error tool_result"; fi
+if has '[sess-ccc333|fix/issue-9] ← ERROR Exit code 127 playwright: command not found'; then pass 13; else fail 13 "missing claude error tool_result"; fi
 
 # 14. Thinking, successful tool_result, and meta events are skipped.
 if ! has 'OK big output' && ! has 'secret' && ! has 'queue-operation'; then pass 14; else fail 14 "skipped content leaked into output"; fi

@@ -31,8 +31,6 @@ services:
       args:
         # Engine version: defaults to latest stable from npm.
         GSD_VERSION: latest
-        # Pin the rtk (Rust Token Killer) version; override to bump.
-        RTK_VERSION: v0.42.4
         # Bot commit identity, sourced from .env. Set COMMIT_AUTHOR_NAME alone
         # (e.g. archon-instinct[bot]); the build derives the no-reply email
         # <app-user-id>+<name>@users.noreply.github.com from the GitHub users
@@ -40,6 +38,48 @@ services:
         # COMMIT_AUTHOR_EMAIL is an optional override of that derived value.
         COMMIT_AUTHOR_NAME: ${COMMIT_AUTHOR_NAME:-}
         COMMIT_AUTHOR_EMAIL: ${COMMIT_AUTHOR_EMAIL:-}
+    # Route every Claude Code -> Anthropic call through the headroom proxy sidecar
+    # (below) for token compression. These env vars reach the Claude Code
+    # subprocess because Archon's Claude provider passes `env: process.env` through
+    # when it spawns the binary. See docs/adr/0003.
+    #   * ANTHROPIC_BASE_URL points Claude Code at the proxy instead of the API.
+    #   * ENABLE_TOOL_SEARCH=true is MANDATORY with a custom base URL: without it
+    #     Claude Code stops deferring tool schemas and materializes every one into
+    #     context, breaking sub-agents (acute for sub-agent-heavy gsd-phase).
+    #     See GH headroomlabs-ai/headroom #746.
+    # To run WITHOUT compression, comment out these two env vars, the depends_on
+    # block below, and the `headroom` service further down.
+    environment:
+      ANTHROPIC_BASE_URL: http://headroom:8787
+      ENABLE_TOOL_SEARCH: "true"
+    depends_on:
+      headroom:
+        # Fail closed: don't start app (and never start a run) until the proxy is
+        # healthy. A dead proxy under headless GSD would otherwise stall silently.
+        condition: service_healthy
+
+  # Headroom proxy sidecar: a transparent context-compression layer between
+  # Claude Code and the Anthropic API (60-95% token savings). Replaces the old
+  # baked rtk binary. Lean mode — no qdrant/neo4j memory stack. It forwards the
+  # incoming request's auth (x-api-key / Bearer) upstream unchanged, so Archon's
+  # CLAUDE_CODE_OAUTH_TOKEN / CLAUDE_API_KEY keeps working. Values mirror
+  # headroom's own docker-compose.yml. See docs/adr/0003.
+  headroom:
+    image: ghcr.io/chopratejas/headroom:latest
+    entrypoint: ["headroom", "proxy"]
+    command: ["--host", "0.0.0.0", "--port", "8787"]
+    environment:
+      HEADROOM_HOST: 0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8787/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    volumes:
+      # Persists savings counters / proxy state across image updates.
+      - headroom_workspace:/home/nonroot/.headroom
 
   # Log sidecar (issue #4): a separate, read-only observer that streams every
   # Run transcript and Claude Code session log to its own stdout. Watch it with:
@@ -64,3 +104,6 @@ services:
       # comment-triggered agent runs, which never become Workflow transcripts.
       - ${ARCHON_USER_HOME:-archon_user_home}:/.home:ro
       - ./log-tail.ts:/log-tail.ts:ro
+
+volumes:
+  headroom_workspace:
