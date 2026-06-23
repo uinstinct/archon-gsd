@@ -8,8 +8,9 @@
 # (why this Dockerfile.user + compose-override mechanism over a standalone image).
 #
 # It also bakes the bot commit identity (COMMIT_AUTHOR_NAME/EMAIL from .env) and
-# turns off Claude Code's co-author trailer — see configure-commit-identity.sh —
-# and installs the rtk token-compressor binary at /usr/local/bin (see install-rtk.sh).
+# turns off Claude Code's co-author trailer — see configure-commit-identity.sh.
+# Token compression is handled out-of-image by the headroom proxy sidecar
+# (docker-compose.override.yml), not baked here. See docs/adr/0003.
 #
 # Built automatically by `docker compose up` once docker-compose.override.yml is
 # in place (it points `app.build.dockerfile` here). The base `archon` image must
@@ -21,22 +22,11 @@ FROM ${BASE_IMAGE}
 # in docker-compose.override.yml or with --build-arg.
 ARG GSD_VERSION=latest
 
-# Pinned rtk (Rust Token Killer) release; override via the compose build arg or
-# with --build-arg. Keep in sync with docker-compose.override.yml and install-rtk.sh.
-ARG RTK_VERSION=v0.42.4
-
 USER root
 # install-gsd-runtime.sh sits at the Archon checkout root (the build context).
 COPY install-gsd-runtime.sh /usr/local/bin/install-gsd-runtime.sh
 RUN chmod +x /usr/local/bin/install-gsd-runtime.sh \
     && GSD_VERSION="${GSD_VERSION}" APP_USER=appuser /usr/local/bin/install-gsd-runtime.sh
-
-# rtk token compressor, baked to /usr/local/bin (outside the shadowed appuser
-# home, so no seed-entrypoint needed). install-rtk.sh sits at the build-context
-# root in production, same as install-gsd-runtime.sh. See ADR 0001.
-COPY install-rtk.sh /usr/local/bin/install-rtk.sh
-RUN chmod +x /usr/local/bin/install-rtk.sh \
-    && RTK_VERSION="${RTK_VERSION}" /usr/local/bin/install-rtk.sh
 
 # Bot commit identity + Claude co-author trailer. Values flow from .env ->
 # docker-compose.override.yml build args -> these ARGs. Set COMMIT_AUTHOR_NAME

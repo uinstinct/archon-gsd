@@ -46,7 +46,7 @@ You run Archon from its own checkout. Three things must be in place: the Engine
 baked into the image, the override workflow reachable, and each target repo prepared.
 
 **1. Bake the Engine.** From your Archon checkout root (the directory holding
-Archon's `docker-compose.yml`), run the one-liner — it pulls the five files
+Archon's `docker-compose.yml`), run the one-liner — it pulls the files
 below straight from this repo:
 
 ```bash
@@ -60,7 +60,6 @@ The files it places (all gitignored by Archon, so your copy stays local):
 | `docker-compose.override.yml` | `docker-compose.override.yml` |
 | `docker/Dockerfile.user` | `Dockerfile.user` |
 | `docker/install-gsd-runtime.sh` | `install-gsd-runtime.sh` |
-| `docker/install-rtk.sh` | `install-rtk.sh` |
 | `docker/configure-commit-identity.sh` | `configure-commit-identity.sh` |
 | `docker/gsd-seed-entrypoint.sh` | `gsd-seed-entrypoint.sh` |
 | `docker/log-tail.ts` | `log-tail.ts` |
@@ -86,6 +85,18 @@ Claude Code's `Co-Authored-By: Claude` commit trailer
 (`includeCoAuthoredBy: false`). Leave `COMMIT_AUTHOR_NAME` unset to keep the
 ambient identity.
 
+**Token compression (headroom).** The override also carries a
+[headroom](https://github.com/headroomlabs-ai/headroom) proxy sidecar that
+transparently compresses every Claude Code → Anthropic call (60–95% token savings).
+Nothing extra to place — it rides along in `docker-compose.override.yml`. The `app`
+service points Claude Code at it with `ANTHROPIC_BASE_URL=http://headroom:8787` and
+`ENABLE_TOOL_SEARCH=true` (the second is **mandatory** with a custom base URL — without
+it Claude Code materializes every tool schema into context and breaks sub-agents; see
+[ADR 0003](./docs/adr/0003-token-compression-via-headroom-proxy.md)). The proxy forwards
+your existing `CLAUDE_CODE_OAUTH_TOKEN` / `CLAUDE_API_KEY` upstream unchanged, and the
+`app` waits for it to be healthy before starting. To run **without** compression, comment
+out the `headroom` service, the two `app` env vars, and the `depends_on` block in the
+override.
 
 ```bash
 docker compose -f docker-compose.yml build   # base `archon` image first

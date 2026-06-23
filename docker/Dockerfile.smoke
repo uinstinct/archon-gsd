@@ -12,18 +12,12 @@
 FROM oven/bun:1.3.11-slim
 
 ARG GSD_VERSION=latest
-ARG RTK_VERSION=v0.42.4
 
 RUN useradd -m -u 1001 -s /bin/bash appuser
 
 COPY docker/install-gsd-runtime.sh /usr/local/bin/install-gsd-runtime.sh
 RUN chmod +x /usr/local/bin/install-gsd-runtime.sh \
     && GSD_VERSION="${GSD_VERSION}" APP_USER=appuser /usr/local/bin/install-gsd-runtime.sh
-
-# Build context is the repo root here, so the COPY needs the docker/ prefix.
-COPY docker/install-rtk.sh /usr/local/bin/install-rtk.sh
-RUN chmod +x /usr/local/bin/install-rtk.sh \
-    && RTK_VERSION="${RTK_VERSION}" /usr/local/bin/install-rtk.sh
 
 COPY tests/smoke/assert-runtime.sh /usr/local/bin/assert-runtime.sh
 RUN chmod +x /usr/local/bin/assert-runtime.sh
