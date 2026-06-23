@@ -38,6 +38,7 @@ services:
         # COMMIT_AUTHOR_EMAIL is an optional override of that derived value.
         COMMIT_AUTHOR_NAME: ${COMMIT_AUTHOR_NAME:-}
         COMMIT_AUTHOR_EMAIL: ${COMMIT_AUTHOR_EMAIL:-}
+
     # Route every Claude Code -> Anthropic call through the headroom proxy sidecar
     # (below) for token compression. These env vars reach the Claude Code
     # subprocess because Archon's Claude provider passes `env: process.env` through
@@ -87,6 +88,8 @@ services:
     volumes:
       # Persists savings counters / proxy state across image updates.
       - headroom_workspace:/home/nonroot/.headroom
+    networks:
+      - archon-network
 
   # Log sidecar (issue #4): a separate, read-only observer that streams every
   # Run transcript and Claude Code session log to its own stdout. Watch it with:
@@ -114,3 +117,8 @@ services:
 
 volumes:
   headroom_workspace:
+
+networks:
+  proxy:
+    external: true
+    name: proxy
