@@ -9,9 +9,12 @@ description: |
   Shell -> Engine override of the bundled archon-fix-github-issue workflow.
 
   Archon is the SHELL: it fetches the issue, guards the .planning/ precondition,
-  creates the fix/issue-<N> branch, classifies the issue size, opens the draft PR,
-  and reports back. GSD is the ENGINE: it researches, plans, executes, verifies,
-  and reviews — invoked headless via /gsd-quick (small) or /gsd-phase (large).
+  classifies the issue size, and for `small` issues creates the fix/issue-<N>
+  branch, opens the draft PR, and reports back. GSD is the ENGINE: it researches,
+  plans, executes, verifies, and reviews — invoked headless via /gsd-quick for
+  `small` issues only. A `large` issue is DECLINED (the Engine is not invoked):
+  the Shell posts a comment flagging it for a human and ends. `gsd:phase` headless
+  is unreliable on big tasks. See CONTEXT.md (Decline) and docs/adr/0004.
 
   This file shadows the bundled default by exact filename. Archon's workflow
   discovery loads it from the repo-scoped `.archon/workflows/` directory, which
@@ -110,10 +113,12 @@ nodes:
         git switch -c "$BRANCH" "$BASE_BRANCH"
         echo "create-branch: created $BRANCH off $BASE_BRANCH"
       fi
-    # depends_on fetch-issue (not guard-planning): guard is now the root so it is
-    # upstream of everything; create-branch needs the resolved issue number, which
-    # extract-issue-number (-> fetch-issue) produces.
-    depends_on: [fetch-issue]
+    # depends_on fetch-issue + size-classify: guard is the DAG root, upstream of
+    # everything; create-branch needs the resolved issue number (from
+    # extract-issue-number -> fetch-issue). It is gated on `small` so a declined
+    # `large` issue never gets an orphan fix/issue-<N> branch with no commits.
+    depends_on: [fetch-issue, size-classify]
+    when: "$size-classify.output.scope == 'small'"
 
   # ═══════════════════════════════════════════════════════════════
   # SHELL — ROUTING (Shell-owned; deliberately NOT gsd:do)
@@ -165,9 +170,10 @@ nodes:
 
   # The handoff is an in-session prompt node: Archon runs the Claude SDK with the
   # `claude_code` system preset and settingSources ['project','user'], so the
-  # container-global GSD install under the appuser home resolves /gsd-quick and
-  # /gsd-phase (registered in hyphen form for the Claude runtime). The body is the
-  # bare slash command so the SDK dispatches it as a command, not prose.
+  # container-global GSD install under the appuser home resolves /gsd-quick
+  # (registered in hyphen form for the Claude runtime). The body is the bare slash
+  # command so the SDK dispatches it as a command, not prose. Only `small` issues
+  # reach here; `large` is declined at comment-large.
   #
   # HEADLESS PRECONDITION: the target repo's .planning/config.json must force
   # unattended execution — `mode: "yolo"`, all `gates.*: false`, all `safety.*:
@@ -188,19 +194,49 @@ nodes:
     context: fresh
     model: large
 
-  - id: handoff-phase
-    prompt: |
-      /gsd-phase $size-classify.output.task
-    depends_on: [create-branch, size-classify]
+  # ═══════════════════════════════════════════════════════════════
+  # SHELL — DECLINE (large issues are NOT auto-fixed; flag for a human)
+  # ═══════════════════════════════════════════════════════════════
+
+  # `gsd:phase` headless is unreliable on big multi-file tasks, so a `large` route
+  # is declined instead of auto-run: no branch, no Engine, no PR — just a comment
+  # flagging the issue for a human. This is a SUCCESSFUL terminal leaf, not an
+  # error. Deterministic bash (no LLM spend, no AskUserQuestion stall) — the
+  # router already produced reasoning + task. See docs/adr/0004.
+  - id: comment-large
+    bash: |
+      set -euo pipefail
+      ISSUE_NUM=$(echo "$extract-issue-number.output" | tr -d "'\"\`\n " | grep -oE '[0-9]+' | head -1)
+      if [ -z "$ISSUE_NUM" ]; then
+        echo "comment-large: could not resolve issue number" >&2
+        exit 1
+      fi
+      BODY=$(mktemp /tmp/decline-comment.XXXXXX.md)
+      cat > "$BODY" <<EOF
+      🚫 **Auto-fix declined — issue too large**
+
+      The router scoped this issue as \`large\`. The Engine's full plan/build/verify
+      loop (\`/gsd-phase\`) is **not** run automatically here, because it is
+      unreliable when run headless on big, multi-file work.
+
+      **Why:** $size-classify.output.reasoning
+
+      **Restated task:** $size-classify.output.task
+
+      Run \`/gsd-phase\` manually with human oversight, or split this into smaller,
+      self-contained issues that can be auto-fixed.
+      EOF
+      gh issue comment "$ISSUE_NUM" --body-file "$BODY"
+      echo "comment-large: posted decline comment on #$ISSUE_NUM"
+    depends_on: [size-classify]
     when: "$size-classify.output.scope == 'large'"
-    context: fresh
-    model: large
 
   # ═══════════════════════════════════════════════════════════════
   # SHELL — CREATE DRAFT PR (rewired to read GSD's outputs)
   # ═══════════════════════════════════════════════════════════════
 
-  # Only one handoff runs; one_success lets create-pr proceed off whichever fired.
+  # Only the quick handoff reaches here (large is declined at comment-large, a
+  # terminal leaf). create-pr depends solely on handoff-quick.
   - id: create-pr
     prompt: |
       Create a draft pull request for the current branch. The Engine (GSD) has
@@ -244,8 +280,7 @@ nodes:
          PR_URL=$(gh pr view --json url -q '.url')
          echo "$PR_URL" > "$ARTIFACTS_DIR/.pr-url"
          ```
-    depends_on: [handoff-quick, handoff-phase]
-    trigger_rule: one_success
+    depends_on: [handoff-quick]
     context: fresh
 
   - id: verify-pr-base

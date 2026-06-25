@@ -24,8 +24,12 @@ The single Archon Node where the Shell invokes GSD. Replaces Archon's native inv
 _Avoid_: bridge, adapter
 
 **Routing**:
-The Shell's decision of which Engine command to call per issue — `gsd:quick` (small) or `gsd:phase` (large). Owned by an Archon classify node, NOT by gsd's own `gsd:do` dispatcher, because `gsd:do` prompts a human on ambiguity and the Shell runs headless.
+The Shell's decision per issue — `small` runs the Engine via `gsd:quick`; `large` is **declined** (the Engine is not invoked) and the issue gets a Decline comment. Owned by an Archon classify node, NOT by gsd's own `gsd:do` dispatcher, because `gsd:do` prompts a human on ambiguity and the Shell runs headless. `gsd:phase` is no longer auto-invoked — see [ADR 0004](./docs/adr/0004-decline-large-issues-instead-of-auto-phase.md).
 _Avoid_: dispatch, gsd:do (deliberately unused here)
+
+**Decline**:
+The Shell's terminal outcome for a `large`-routed issue: no branch, no Engine run, no PR — just a GitHub comment flagging the issue for a human. The router declined to auto-fix because `gsd:phase` headless is unreliable on big tasks.
+_Avoid_: reject, skip, fail (it is a successful run, not an error)
 
 **Headless**:
 The unattended mode the Engine must run in under Archon — no human to answer prompts. Requires `mode:"yolo"`, all `gates:false`, `safety.*:false`, and skipping discuss. Any `AskUserQuestion` the Engine reaches is a stall, so the design avoids paths that call it.
